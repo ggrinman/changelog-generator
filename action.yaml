@@ -1,0 +1,12 @@
+name: "Changelog Generator"
+author: "Gerardo Grinman <ggrinman@gmail.com>"
+description: "Generates a changelog from commit history based on Angular commit message syntax"
+outputs:
+  changelog:
+    description: "A CHANGELOG.md file added to the Pull-Request."
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+branding:
+  icon: 'book'
+  color: 'blue'
