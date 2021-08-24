@@ -22,11 +22,11 @@
 import re
 import shlex
 import subprocess
+import datetime
 
 def get_commit_log():
-    # TODO find how to use timestamp instead to sort by datetime and keep items grouped by type
     # git log format options https://git-scm.com/docs/git-log
-    output = subprocess.check_output(shlex.split('git log --format="%as|**|%s|**|%h" --color'), stderr=subprocess.STDOUT)
+    output = subprocess.check_output(shlex.split('git log --format="%at|**|%s|**|%h" --color'), stderr=subprocess.STDOUT)
     output = output.decode('ascii')
     output = output.split('\n')
     return output
@@ -37,47 +37,53 @@ def strip_comment(comment):
         return comment
     return ''
 
-def overwrite_changelog_by_date(commits):
-    output = ['# Change Log']
+def group_commits_by_date_and_type(commits):
+    output = {}
+    for line in commits:
+        line_details = line.split('|**|')
+        if len(line_details) == 3:
+            comment = line_details[1]
+            timestamp = line_details[0]
+            date = datetime.datetime.fromtimestamp(int(timestamp)).strftime('%Y-%m-%d')
+            dt = datetime.datetime.fromtimestamp(int(timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+            hash = line_details[2]
+            if (strip_comment(comment) != ''):
+                if date not in output:
+                    output[date] = {}
+                type = comment.split(':')[0] + ':'
+                if type not in output[date]:
+                    output[date][type] = []
+                output[date][type].append({"message":comment,"hash":hash,"datetime":dt})
+    return output
+
+def overwrite_changelog(commits):
+    output = ['# Changelog']
     convention_types = {
-        "build:": "Build",
-        "ci:": "CI",
         "feat:": "Features",
         "fix:": "Fixes",
+        "build:": "Build",
+        "ci:": "CI",
         "perf:": "Performance",
         "refactor:": "Refactor",
         "style:": "Styles",
         "test:": "Tests" 
-    }    
-    current_date = ''
-    current_type = ''
-    for line in commits:
-        line_details = line.split('|**|')
-        if len(line_details) == 3:
-            comments = line_details[1]
-            date = line_details[0]
-            hash = line_details[2]
-            if (strip_comment(comments) != ''):
-                if (date != current_date):
-                    current_date = date
-                    current_type = ''
-                    output.append('## ' + date)
-                for type in convention_types:
-                  if re.findall(r'^' + type, comments) and current_type != convention_types[type]:
-                      current_type = convention_types[type]
-                      output.append('### ' + current_type)
-                # if re.findall(r'^feat:', comments) and current_type != 'Features':
-                #     current_type = 'Features'
-                #     output.append('### Features')                
-                output.append('* ' + comments + ' ([' + hash + '](../../commit/' + hash + '))')
-    with open("/github/home/CHANGELOG.md", "w+") as file:
-        file.writelines("%s\n" % l for l in output)
+    }
+    for date in commits:
+        output.append('## ' + date)
+        for type in convention_types:
+            if type in commits[date]:
+                output.append('### ' + convention_types[type])
+                for commit in commits[date][type]:
+                    output.append('* ' + commit['message'] + ' ([' + commit['hash'] + '](../../commit/' + commit['hash'] + '))')
     # for line in output:
     #     print(line)
+    with open("/github/home/CHANGELOG.md", "w+") as file:
+        file.writelines("%s\n" % l for l in output)
     return
 
 def main():
     commits = get_commit_log()
-    overwrite_changelog_by_date(sorted(commits, reverse=True))
+    commits = group_commits_by_date_and_type(commits)
+    overwrite_changelog(commits)
 
 main()
