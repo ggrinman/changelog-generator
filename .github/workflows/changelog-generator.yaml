@@ -2,7 +2,7 @@ name: Changelog Generator
 on:
   push:
     branches:
-      - main
+      - master
 jobs:
   generate:
     name: Changelog Generator
