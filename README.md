@@ -1,1 +1,1 @@
-# changelog-generator
+# GitHub Action - Changelog Generator
